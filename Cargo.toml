@@ -12,6 +12,7 @@ members = [
     "sui_programmability/verifier",
     "sui_types",
     "test_utils",
+    "testsuite",
 ]
 
 [profile.release]
