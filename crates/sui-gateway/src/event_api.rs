@@ -11,6 +11,7 @@ use strum_macros::EnumIter;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::Sender;
 use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
 use tracing::{debug, warn};
 
 use sui_core::gateway_types::SuiEvent;
@@ -79,6 +80,7 @@ impl EventApiServer for EventApiImpl {
             Some(sink) => sink,
             _ => return,
         };
+        // TODO: We can apply additional filter to the broadcast stream
         tokio::spawn(async move {
             match sink.pipe_from_try_stream(rx).await {
                 SubscriptionClosed::Success => {
