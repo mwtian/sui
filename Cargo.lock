@@ -5819,6 +5819,8 @@ dependencies = [
  "serde 1.0.137",
  "serde_json",
  "serde_with",
+ "strum",
+ "strum_macros",
  "sui-config",
  "sui-core",
  "sui-json",
@@ -5826,6 +5828,7 @@ dependencies = [
  "sui-open-rpc-macros",
  "sui-types",
  "tokio",
+ "tokio-stream",
  "tracing",
  "workspace-hack",
 ]
@@ -5873,6 +5876,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap 3.1.18",
+ "jsonrpsee",
  "multiaddr",
  "mysten-network",
  "prometheus_exporter",
