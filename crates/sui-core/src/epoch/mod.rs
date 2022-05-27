@@ -4,6 +4,8 @@
 use serde::{Deserialize, Serialize};
 use sui_types::committee::Committee;
 
+pub mod reconfiguration;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct EpochInfoLocals {
     pub committee: Committee,
