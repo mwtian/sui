@@ -40,7 +40,6 @@ impl SuiNode {
                 config.db_path().join("checkpoints"),
                 None,
                 config.public_key(),
-                config.committee_config().committee(),
                 secret.clone(),
             )?)))
         } else {
