@@ -26,7 +26,6 @@ use sui_types::crypto::{AuthoritySignInfo, EmptySignInfo};
 use sui_types::object::Owner;
 use sui_types::storage::{ChildObjectResolver, SingleTxContext, WriteKind};
 use sui_types::{base_types::SequenceNumber, storage::ParentSync};
-use tokio::sync::Notify;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tracing::{debug, info, trace};
 use typed_store::rocks::DBBatch;
@@ -60,9 +59,6 @@ pub struct SuiDataStore<S> {
 
     /// Internal vector of locks to manage concurrent writes to the database
     mutex_table: MutexTable<ObjectDigest>,
-
-    // A notifier for new pending certificates
-    pending_notifier: Arc<Notify>,
 
     pub(crate) perpetual_tables: AuthorityPerpetualTables<S>,
     pub(crate) epoch_tables: ArcSwap<AuthorityEpochTables<S>>,
@@ -98,7 +94,6 @@ impl<S: Eq + Debug + Serialize + for<'de> Deserialize<'de>> SuiDataStore<S> {
             wal,
             lock_service,
             mutex_table: MutexTable::new(NUM_SHARDS, SHARD_SIZE),
-            pending_notifier: Arc::new(Notify::new()),
             perpetual_tables,
             epoch_tables: epoch_tables.into(),
             path: path.into(),
@@ -138,13 +133,6 @@ impl<S: Eq + Debug + Serialize + for<'de> Deserialize<'de>> SuiDataStore<S> {
     /// Acquire the lock for a tx without writing to the WAL.
     pub async fn acquire_tx_lock(&self, digest: &TransactionDigest) -> CertLockGuard {
         CertLockGuard(self.wal.acquire_lock(digest).await)
-    }
-
-    // TODO: Async retry method, using tokio-retry crate.
-
-    /// Await a new pending certificate to be added
-    pub async fn wait_for_new_pending(&self) {
-        self.pending_notifier.notified().await
     }
 
     /// Returns the TransactionEffects if we have an effects structure for this transaction digest
@@ -196,45 +184,6 @@ impl<S: Eq + Debug + Serialize + for<'de> Deserialize<'de>> SuiDataStore<S> {
     #[cfg(test)]
     pub fn get_next_object_version(&self, obj: &ObjectID) -> Option<SequenceNumber> {
         self.epoch_tables().next_object_versions.get(obj).unwrap()
-    }
-
-    /// Adds a number of digests to the pending digests table.
-    pub fn add_pending_digests(&self, digests: Vec<TransactionDigest>) -> SuiResult<()> {
-        let batch = self.epoch_tables().pending_execution.batch();
-        let batch = batch.insert_batch(
-            &self.epoch_tables().pending_execution,
-            digests.into_iter().map(|digest| (digest, true)),
-        )?;
-        batch.write()?;
-
-        // now notify there is a pending certificate
-        self.pending_notifier.notify_one();
-
-        Ok(())
-    }
-
-    /// Get all stored pending digests
-    pub fn get_pending_digests(&self) -> SuiResult<Vec<TransactionDigest>> {
-        Ok(self
-            .epoch_tables()
-            .pending_execution
-            .iter()
-            .map(|(digest, _)| digest)
-            .collect())
-    }
-
-    /// Remove entries from pending certificates
-    pub fn remove_pending_digests(&self, seqs: Vec<TransactionDigest>) -> SuiResult<()> {
-        let batch = self.epoch_tables().pending_execution.batch();
-        let batch = batch.delete_batch(&self.epoch_tables().pending_execution, seqs.iter())?;
-        batch.write()?;
-        Ok(())
-    }
-
-    // Empty the pending_execution table.
-    pub fn remove_all_pending_certificates(&self) -> SuiResult {
-        self.epoch_tables().pending_execution.clear()?;
-        Ok(())
     }
 
     /// A function that acquires all locks associated with the objects (in order to avoid deadlocks).

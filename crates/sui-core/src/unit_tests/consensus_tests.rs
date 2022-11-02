@@ -118,7 +118,7 @@ async fn listen_to_sequenced_transaction() {
         .unwrap();
 
     // Spawn a consensus listener.
-    ConsensusListener::spawn(/* rx_consensus_input */ rx_sui_to_consensus);
+    ConsensusListener::spawn(/* rx_consensus_listener */ rx_sui_to_consensus);
 
     // Submit a sample consensus transaction.
     let (waiter, signals) = ConsensusWaiter::new();
@@ -185,14 +185,19 @@ async fn submit_transaction_to_consensus_adapter() {
             // Set the shared object locks.
             state_guard
                 .handle_consensus_transaction(VerifiedSequencedConsensusTransaction::new_test(
-                    ConsensusTransaction::new_certificate_message(&name, *certificate),
+                    ConsensusTransaction::new_certificate_message(&name, *certificate.clone()),
                 ))
                 .await
                 .unwrap();
 
-            // Reply to the adapter.
+            // Reply to the adapter. This fails when Narwhal is not running when submitting in
+            // ConsensusAdapter, dropping the receiver. But this is ok because the submit will
+            // be retried.
             let result = Ok(());
-            replier.0.send(result).unwrap();
+            let _ = replier
+                .0
+                .send(result)
+                .tap_err(|err| println!("Failed to send success signal: {:?}", err));
         }
     });
 

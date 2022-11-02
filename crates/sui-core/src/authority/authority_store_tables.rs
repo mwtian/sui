@@ -22,16 +22,6 @@ pub struct AuthorityEpochTables<S> {
     #[default_options_override_fn = "transactions_table_default_config"]
     pub(crate) transactions: DBMap<TransactionDigest, TrustedTransactionEnvelope<S>>,
 
-    /// The pending execution table holds digests for transactions that are present
-    /// in the certificates table, but may not have yet been executed, and should be executed.
-    /// The source of these certificates might be (1) the checkpoint proposal process (2) the
-    /// gossip processes (3) the shared object post-consensus task. This table is used to recoever
-    /// the state of ObjectManager, which publishes transaction digests that are ready to execute.
-    /// Execution driver subscribes to ObjectManager and executes the ready certificates.
-    /// Once a digest is executed and effects are written, its entry should be deleted.
-    /// Value of pending_execution is currently unused.
-    pub(crate) pending_execution: DBMap<TransactionDigest, bool>,
-
     /// Hold the lock for shared objects. These locks are written by a single task: upon receiving a valid
     /// certified transaction from consensus, the authority assigns a lock to each shared objects of the
     /// transaction. Note that all authorities are guaranteed to assign the same lock to these objects.

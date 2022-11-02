@@ -47,14 +47,16 @@ where
 
     // Loop whenever there is a signal that a new transactions is ready to process.
     loop {
-        let digest = if let Some(digest) = active_authority.state.next_ready_digest().await {
-            digest
+        let certificate = if let Some(cert) = active_authority.state.next_ready_certificate().await
+        {
+            cert
         } else {
             // Should not happen. Only possible if the AuthorityState has shut down.
             warn!("Ready digest stream from authority state is broken. Retrying in 10s ...");
             sleep(std::time::Duration::from_secs(10)).await;
             continue;
         };
+        let digest = *certificate.digest();
         debug!(?digest, "Pending certificate execution activated.");
 
         // Process any tx that failed to commit.
@@ -64,34 +66,15 @@ where
 
         let authority = active_authority.clone();
         tokio::task::spawn(async move {
-            let cert = match authority
-                .state
-                .node_sync_store
-                .get_cert(authority.state.epoch(), &digest)
-            {
-                Err(e) => {
-                    error!(
-                        ?digest,
-                        "Unexpected error to get pending certified transaction: {e}"
-                    );
-                    return;
-                }
-                Ok(None) => {
-                    error!(?digest, "Pending certified transaction not found!");
-                    return;
-                }
-                Ok(Some(cert)) => cert,
-            };
-
-            if let Err(e) = authority.state.handle_certificate(&cert).await {
+            if let Err(e) = authority.state.handle_certificate(&certificate).await {
                 error!(?digest, "Failed to execute certified transaction! {e}");
             }
 
             // Remove the pending digest after successful execution.
             let _ = authority
                 .state
-                .database
-                .remove_pending_digests(vec![digest]);
+                .node_sync_store
+                .cleanup_cert(certificate.epoch(), &digest);
         });
     }
 }
