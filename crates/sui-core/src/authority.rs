@@ -2503,7 +2503,13 @@ impl AuthorityState {
                         .record_owned_object_cert_from_consensus(&certificate, consensus_index)
                         .await?;
                 }
-
+                // If the effect already exists, shared locks would not be set, and no additional
+                // processing is needed anyway.
+                // TODO: verify if handle_consensus_transaction() and handle_certificate_with_effects()
+                // can run together on the same node.
+                if let Ok(Some(..)) = self.database.perpetual_tables.effects.get(certificate.digest()) {
+                    return Ok(());
+                }
                 // Schedule the certificate for execution
                 self.add_pending_certificates(vec![certificate.clone()])
                     .await
