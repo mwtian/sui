@@ -32,6 +32,10 @@ use sui_types::query::{EventQuery, TransactionQuery};
 /// for document purposes.
 pub const QUERY_MAX_RESULT_LIMIT: usize = 1000;
 
+/// Enforces a server side timeout on handling requests, currently only used in
+/// execute_transaction() handler.
+pub const MAX_TIMEOUT_SECS: u64 = 30;
+
 #[open_rpc(namespace = "sui", tag = "Gateway Transaction Execution API")]
 #[rpc(server, client, namespace = "sui")]
 pub trait RpcGatewayApi {

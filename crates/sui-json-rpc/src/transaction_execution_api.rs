@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::api::TransactionExecutionApiServer;
+use crate::api::{TransactionExecutionApiServer, MAX_TIMEOUT_SECS};
 use crate::SuiRpcModule;
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -11,6 +11,7 @@ use jsonrpsee_core::server::rpc_module::RpcModule;
 use move_bytecode_utils::module_cache::SyncModuleCache;
 use signature::Signature;
 use std::sync::Arc;
+use std::time::Duration;
 use sui_core::authority::{AuthorityStore, ResolverWrapper};
 use sui_core::authority_client::NetworkAuthorityClient;
 use sui_core::transaction_orchestrator::TransactiondOrchestrator;
@@ -24,6 +25,7 @@ use sui_types::{
     crypto::SignableBytes,
     messages::{Transaction, TransactionData},
 };
+use tokio::time::timeout;
 
 pub struct FullNodeTransactionExecutionApi {
     pub transaction_orchestrator: Arc<TransactiondOrchestrator<NetworkAuthorityClient>>,
@@ -68,13 +70,15 @@ impl TransactionExecutionApiServer for FullNodeTransactionExecutionApi {
         let txn_digest = *txn.digest();
 
         let transaction_orchestrator = self.transaction_orchestrator.clone();
-        let response = spawn_monitored_task!(transaction_orchestrator.execute_transaction(
-            ExecuteTransactionRequest {
+        let response = spawn_monitored_task!(timeout(
+            Duration::from_secs(MAX_TIMEOUT_SECS),
+            transaction_orchestrator.execute_transaction(ExecuteTransactionRequest {
                 transaction: txn,
                 request_type,
-            }
+            })
         ))
         .await
+        .map_err(|e| anyhow!(e))? // for timeout
         .map_err(|e| anyhow!(e))? // for JoinError
         .map_err(|e| anyhow!(e))?; // For Sui transaction execution error (SuiResult<ExecuteTransactionResponse>)
 
