@@ -4330,7 +4330,6 @@ pub(crate) async fn send_consensus(authority: &AuthorityState, cert: &VerifiedCe
             .handle_consensus_transaction(
                 transaction,
                 &Arc::new(CheckpointServiceNoop {}),
-                authority.transaction_manager(),
                 authority.db(),
             )
             .await
