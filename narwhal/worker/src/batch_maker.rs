@@ -30,7 +30,7 @@ use types::{
 };
 
 // The number of batches to store / transmit in parallel.
-pub const MAX_PARALLEL_BATCH: usize = 100;
+pub const MAX_PARALLEL_BATCH: usize = 1000;
 
 #[cfg(test)]
 #[path = "tests/batch_maker_tests.rs"]

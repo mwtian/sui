@@ -13,7 +13,7 @@ use types::{
 };
 
 /// The maximum number of digests kept in memory waiting to be sent to the primary.
-pub const MAX_PENDING_DIGESTS: usize = 10_000;
+pub const MAX_PENDING_DIGESTS: usize = 1_000;
 
 // Send batches' digests to the primary.
 pub struct PrimaryConnector {
