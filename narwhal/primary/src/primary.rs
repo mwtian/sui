@@ -782,7 +782,7 @@ impl PrimaryReceiverHandler {
         // This check is necessary for correctness, because it is possible that the list of missing
         // parents in the request is incomplete, or wait_notifications get notified on shut down
         // without actually having the parents available.
-        let (parents, missing) = self.synchronizer.get_parents(header)?;
+        let (parents, missing) = self.synchronizer.get_parent_authors(header)?;
         if !missing.is_empty() {
             return Ok(RequestVoteResponse {
                 vote: None,
@@ -802,18 +802,9 @@ impl PrimaryReceiverHandler {
         // - form a quorum
         // - are all from the previous round
         // - are from unique authorities
-        let mut parent_authorities = BTreeSet::new();
         let mut stake = 0;
-        for parent in parents.iter() {
-            ensure!(
-                parent.round() + 1 == header.round,
-                DagError::HeaderHasInvalidParentRoundNumbers(header.digest())
-            );
-            ensure!(
-                parent_authorities.insert(&parent.header.author),
-                DagError::HeaderHasDuplicateParentAuthorities(header.digest())
-            );
-            stake += committee.stake_by_id(parent.origin());
+        for parent in parents {
+            stake += committee.stake_by_id(parent);
         }
         ensure!(
             stake >= committee.quorum_threshold(),

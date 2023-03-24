@@ -171,6 +171,30 @@ impl CertificateStore {
         }
     }
 
+    /// Retrieves all authority identifiers and certificate digests for a given round.
+    pub fn read_ids(
+        &self,
+        round: Round,
+    ) -> StoreResult<BTreeMap<CertificateDigest, AuthorityIdentifier>> {
+        fail::fail_point!("certificate-store", |_| {
+            Err(RocksDBError(format!(
+                "Injected error in certificate store read_id"
+            )))
+        });
+        let mut result = BTreeMap::new();
+        let iter = self
+            .certificate_id_by_round
+            .iter()
+            .skip_to(&(round, AuthorityIdentifier(0)))?;
+        for ((r, id), digest) in iter {
+            if r != round {
+                break;
+            }
+            assert!(result.insert(digest, id).is_none());
+        }
+        Ok(result)
+    }
+
     /// Retrieves a certificate from the store. If not found
     /// then None is returned as result.
     pub fn contains(&self, id: &CertificateDigest) -> StoreResult<bool> {
@@ -453,7 +477,7 @@ mod test {
     use futures::future::join_all;
     use std::{
         collections::{BTreeSet, HashSet},
-        time::Instant,
+        time::Instant, mem::take,
     };
     use store::rocks::MetricConf;
     use store::{
@@ -595,6 +619,54 @@ mod test {
             assert_eq!(rounds[i], r);
             i += 1;
             current_round = r;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_read_ids() {
+        // GIVEN
+        let store = new_store(temp_dir());
+        let total_rounds = 3;
+        let certs = certificates(total_rounds);
+
+        // Write all certificates from round 1, and parts of certificates from round 2.
+        let cert_cutoff = 7;
+        store.write_all(certs.clone().into_iter().take(cert_cutoff)).unwrap();
+
+        // WHEN
+        let result = store
+            .read_ids(1)
+            .unwrap();
+
+        println!("Total time: {} seconds", now.elapsed().as_secs_f32());
+
+        // THEN
+        let certs_per_round = 4;
+        assert_eq!(
+            result.len() as u64,
+            (total_rounds - round_cutoff + 1) * certs_per_round
+        );
+
+        // AND result certificates should be returned in increasing order
+        let mut last_round = 0;
+        for certificate in result {
+            assert!(certificate.round() >= last_round);
+            last_round = certificate.round();
+
+            // should be amongst the certificates of the cut-off round
+            assert!(certs_ids_over_cutoff_round.remove(&certificate.digest()));
+        }
+
+        // AND none should be left in the original set
+        assert!(certs_ids_over_cutoff_round.is_empty());
+
+        // WHEN get rounds per origin.
+        let rounds = store
+            .origins_after_round(round_cutoff)
+            .expect("Error returned while reading origins_after_round");
+        assert_eq!(rounds.len(), (total_rounds - round_cutoff + 1) as usize);
+        for origins in rounds.values() {
+            assert_eq!(origins.len(), 4);
         }
     }
 

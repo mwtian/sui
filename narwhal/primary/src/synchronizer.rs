@@ -971,25 +971,32 @@ impl Synchronizer {
 
     /// Returns the parent certificates of the given header, and a list of digests for any
     /// that are missing.
-    pub fn get_parents(
+    pub fn get_parent_authors(
         &self,
         header: &Header,
-    ) -> DagResult<(Vec<Certificate>, Vec<CertificateDigest>)> {
+    ) -> DagResult<(Vec<AuthorityIdentifier>, Vec<CertificateDigest>)> {
+        let mut authors = Vec::new();
         let mut missing = Vec::new();
-        let mut parents = Vec::new();
-        for digest in &header.parents {
-            let cert = if header.round == 1 {
-                self.inner.genesis.get(digest).cloned()
-            } else {
-                self.inner.certificate_store.read(*digest)?
-            };
-            match cert {
-                Some(certificate) => parents.push(certificate),
-                None => missing.push(*digest),
-            };
+        if header.round == 1 {
+            for digest in &header.parents {
+                if let Some(cert) = self.inner.genesis.get(digest) {
+                    authors.push(cert.header.author);
+                } else {
+                    return Err(DagError::InvalidGenesisParent(*digest));
+                }
+            }
+            return Ok((authors, missing));
         }
-
-        Ok((parents, missing))
+        let parent_round = header.round - 1;
+        let ids = self.inner.certificate_store.read_ids(parent_round)?;
+        for digest in &header.parents {
+            if let Some(id) = ids.get(digest) {
+                authors.push(*id);
+            } else {
+                missing.push(*digest);
+            }
+        }
+        Ok((authors, missing))
     }
 
     /// Tries to get all missing parents of the certificate. If there is any, sends the
