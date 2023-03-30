@@ -374,4 +374,74 @@ impl Subscriber {
     }
 }
 
-// TODO: add a unit test
+#[cfg(test)]
+mod test {
+    use prometheus::Registry;
+    use test_utils::CommitteeFixture;
+    use types::PreSubscribedBroadcastSender;
+
+    use super::*;
+
+    #[tokio::test]
+    pub async fn test_fetch_from_workers() {
+        let fixture = CommitteeFixture::builder().randomize_ports(true).build();
+        let committee = fixture.committee();
+        let worker_cache = fixture.worker_cache();
+        let primary = fixture.authorities().last().unwrap();
+        let authority_id = primary.id();
+        let client = NetworkClient::new_from_keypair(&primary.network_keypair());
+        let metrics = Arc::new(ExecutorMetrics::new(&Registry::new()));
+
+        let mut tx_shutdown = PreSubscribedBroadcastSender::new(1);
+        let rx_shutdown = tx_shutdown.subscribe();
+        let (_tx_sequence, rx_sequence) = test_utils::test_channel!(1);
+        let subscriber = Subscriber {
+            rx_shutdown,
+            rx_sequence,
+            inner: Arc::new(Inner {
+                authority_id,
+                committee,
+                worker_cache,
+                client,
+                metrics,
+            }),
+        };
+
+        
+
+        // let mut network = TestSubscriberNetwork::new(2);
+        // let batch1 = Batch::new(vec![vec![1]]);
+        // let batch2 = Batch::new(vec![vec![2]]);
+        // let (digests, known_workers) = HashMap::from_iter(vec![
+        //     (
+        //         0,
+        //         (
+        //             HashSet::from_iter(vec![batch2.digest()]),
+        //             HashSet::from_iter(test_pks(&[4, 5])),
+        //         ),
+        //     ),
+        //     (
+        //         1,
+        //         (
+        //             HashSet::from_iter(vec![batch1.digest()]),
+        //             HashSet::from_iter(test_pks(&[1, 2, 3])),
+        //         ),
+        //     ),
+        // ]);
+        // // one batch available locally on worker 1
+        // network.put(1, &[1, 2, 3], batch1.clone());
+        // // other batch available remotely on worker 0
+        // network.put(0, &[4, 5], batch2.clone());
+        // let fetcher = BatchFetcher {
+        //     network: Arc::new(network.clone()),
+        //     batch_store: test_utils::create_batch_store(),
+        //     metrics: Arc::new(WorkerMetrics::default()),
+        // };
+        // let expected_batches = HashMap::from_iter(vec![
+        //     (batch1.digest(), batch1.clone()),
+        //     (batch2.digest(), batch2.clone()),
+        // ]);
+        // let fetched_batches = fetcher.fetch(batch_digests_and_workers).await;
+        // assert_eq!(fetched_batches, expected_batches);
+    }
+}
