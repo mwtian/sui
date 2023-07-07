@@ -41,7 +41,7 @@ use self::reconfig_observer::ReconfigObserver;
 #[cfg(test)]
 mod tests;
 
-const TASK_QUEUE_SIZE: usize = 10000;
+const TASK_QUEUE_SIZE: usize = 100;
 const EFFECTS_QUEUE_SIZE: usize = 10000;
 const TX_MAX_RETRY_TIMES: u8 = 10;
 
