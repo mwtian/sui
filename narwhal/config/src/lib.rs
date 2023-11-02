@@ -259,7 +259,7 @@ impl NetworkAdminServerParameters {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AnemoParameters {
     /// Per-peer rate-limits (in requests/sec) for the PrimaryToPrimary service.
     pub send_certificate_rate_limit: Option<NonZeroU32>,
@@ -278,10 +278,22 @@ pub struct AnemoParameters {
 
 impl AnemoParameters {
     pub fn excessive_message_size(&self) -> usize {
-        const EXCESSIVE_MESSAGE_SIZE: usize = 8 << 20;
+        self.excessive_message_size.unwrap_or(0)
+    }
+}
 
-        self.excessive_message_size
-            .unwrap_or(EXCESSIVE_MESSAGE_SIZE)
+impl Default for AnemoParameters {
+    fn default() -> Self {
+        Self {
+            // By default, at most 10 certificates can be sent concurrently to a peer.
+            send_certificate_rate_limit: Some(NonZeroU32::new(20).unwrap()),
+            // By default, at most 100 batches can be broadcasted concurrently.
+            report_batch_rate_limit: Some(NonZeroU32::new(200).unwrap()),
+            // As of 11/02/2023, when one worker is actively fetching, each peer receives
+            // 20~30 requests per second.
+            request_batches_rate_limit: Some(NonZeroU32::new(100).unwrap()),
+            excessive_message_size: Some(8 << 20),
+        }
     }
 }
 
