@@ -8,6 +8,7 @@ use consensus_types::block::TransactionIndex;
 use fastcrypto_tbls::dkg_v1;
 use mysten_metrics::monitored_scope;
 use prometheus::{register_int_counter_with_registry, IntCounter, Registry};
+use rand::Rng as _;
 use sui_types::{
     error::{SuiError, SuiResult},
     messages_consensus::{ConsensusTransaction, ConsensusTransactionKind},
@@ -173,6 +174,14 @@ impl SuiTxValidator {
             tx.data(),
             self.authority_state.check_system_overload_at_signing(),
         )?;
+
+        {
+            if rand::thread_rng().gen_range(1..=100) <= 34 {
+                return Err(SuiError::UnexpectedMessage(
+                    "Injected retriable error".to_string(),
+                ));
+            }
+        }
 
         let tx = epoch_store.verify_transaction(*tx)?;
 
